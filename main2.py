@@ -69,14 +69,14 @@ def DV(lexico):
           print('Erro sintático: esperado ":" na linha ', x.linha)
           return 'erro'
       lexico.devolver()
-      print('Declaração de variáveis concluída')
+      print('Declaração de variáveis concluída na linha ', x.linha)
       return lexico 
     else:
       print('Erro sintático: esperado identificador na linha ', x.linha)
       return 'erro'
   else:
     lexico.devolver()
-    print('Declaração de variáveis concluída')
+    print('Declaração de variáveis concluída na linha ', x.linha)
     return lexico
 
 #############  Declaração de subprogramas  ################
@@ -95,8 +95,10 @@ def lista_parametros(lexico): # base = A:integer, B:real
         x = lexico.next()
         if x.token == ',':
           lexico = lista_parametros(lexico)
+          return lexico
         else:
           lexico = lexico.devolver()
+          print('Declaração de parâmetros concluída na linha ', x.linha)
           return lexico
       else:
         print('Erro sintático: esperado tipo na linha ', x.linha)
@@ -121,47 +123,28 @@ def DS(lexico):
       if x.classifier == 'IDENTIFIER': # id é id ou identifier?
         x = lexico.next()
         if x.token == '(':
-          lexico = lista_parametros(lexico) # POSSIVEL ERRO
+          lexico = lista_parametros(lexico) 
           if lexico == 'erro':
             print('erro')
+            return erro
           else:
-            print(lexico)
             x = lexico.next()
             if x.token != ')':
               print('Erro sintático: esperado ")" na linha', x.linha)
               return 'erro'
-        lexico = DV(lexico)
         x = lexico.next()
-        if x.token == ';': 
-          '''
-          declarações_variáveis
-          declarações_de_subprogramas
-          comando_composto 
-          '''
-          lexico = DV(lexico)
-          if lexico == 'erro':
-            print('Análise finalizada na linha', x.linha)
-            return lexico
-          else:
-            lexico = DS(lexico)
-            if lexico == 'erro':
-              lexico.exibir()
-              print('Análise finalizada na linha', x.linha)
-            else:
-              lexico = CC(lexico)
-              if lexico == 'erro':
-                print('Análise finalizada na linha', x.linha)
-              else:
-                x = lexico.next()
-                if x.token == '.':
-                  print('Programa está sintaticamente correto na linha', x.linha)
-        else:
-          print('Erro sintático: esperado ";" na linha', x.linha)
+        if x.token != ';':
+          print('Erro sintático: esperando ";" na linha', x.linha)
           return 'erro'
+        lexico = DV(lexico) # ok
+        x = lexico.next()
       else:
         print('Erro sintático: esperado "id" na linha', x.linha)
         return 'erro'
-    lexico.devolver()
+    lexico = lexico.devolver()
+    lexico = CC(lexico)
+    if lexico == 'erro':
+      return 'erro'
     print('Declaração de subprogramas concluída')
     return lexico
   else:
@@ -204,7 +187,7 @@ def fator(lexico):
     else:
       print('Erro sintático: esperado ")" na linha ', x.linha)
       return 'erro'
-  elif x.token == 'id':
+  elif x.classifier == 'IDENTIFIER': # id ou identifier?
     x = lexico.next()
     if x.token == '(':
       lexico = lista_expressoes(lexico)
@@ -227,6 +210,7 @@ def e_s(lexico):
   '''
   x = lexico.next()
   if x.token in ['+', '-', 'or']:
+    lexico.exibir()
     lexico = fator(lexico)
     lexico = termo1(lexico)
     lexico = e_s(lexico)
@@ -248,6 +232,7 @@ def expressao_simples(lexico):
     lexico = termo1(lexico)
     lexico = e_s(lexico)
   else:
+    lexico = lexico.devolver()
     lexico = fator(lexico)
     lexico = termo1(lexico)
     lexico = e_s(lexico)
