@@ -177,7 +177,8 @@ def fator(lexico):
   | not fator 
   '''
   x = lexico.next()
-  if x.token in ['num_int', 'num_real', 'true', 'false']:
+  # num_int -> INTEGER, num_real -> REAL
+  if x.token in ['true', 'false'] or x.classifier in ['INTEGER', 'REAL']: 
     return lexico
   elif x.token == '(':
     lexico = expressao(lexico)
@@ -210,7 +211,6 @@ def e_s(lexico):
   '''
   x = lexico.next()
   if x.token in ['+', '-', 'or']:
-    lexico.exibir()
     lexico = fator(lexico)
     lexico = termo1(lexico)
     lexico = e_s(lexico)
@@ -233,7 +233,7 @@ def expressao_simples(lexico):
     lexico = e_s(lexico)
   else:
     lexico = lexico.devolver()
-    lexico = fator(lexico)
+    lexico = fator(lexico) 
     lexico = termo1(lexico)
     lexico = e_s(lexico)
     return lexico
@@ -302,6 +302,7 @@ def comando(lexico):
         lexico = lista_comandos(lexico)
         x = lexico.next()
         if x.token == 'end':
+          lexico = lexico.devolver() # NAO TINHA ANTES, TIRAR SE PROVOCAR ERRO
           return lexico
         else:
           print('Erro sintático: esperado "end" na linha ', x.linha)
@@ -350,6 +351,7 @@ def CC(lexico):
     lexico = lista_comandos(lexico)
     x = lexico.next()
     if x.token == 'end':
+      print('Devolvendo na linha', x.linha)
       return lexico
     else:
       print('Erro sintático: esperado "end" na linha', x.linha)
@@ -378,11 +380,11 @@ def analise_sintatica(analise_lexica):
             lexico.exibir()
             print('Análise finalizada')
           else:
-            resposta.exibir()
             resposta = CC(resposta)
             if resposta == 'erro':
               print('Análise finalizada')
             else:
+              print('\n FINALIZANDO \n')
               x = lexico.next()
               if x.token == '.':
                 print('Programa está sintaticamente correto')
