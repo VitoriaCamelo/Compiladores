@@ -1,3 +1,4 @@
+import sys
 import lexico
 
 #############  Básico  ################
@@ -19,7 +20,7 @@ class Lexico:
     return self
   def exibir(self):
     for token in self.analise_lexica[self.conta_tokens:]:
-      print(token.token, token.classifier)
+      print(token.token, token.classifier, token.linha)
 
 #############  Declaração de variáveis  ################
 def DV(lexico):
@@ -43,8 +44,8 @@ def DV(lexico):
           if x.classifier == 'IDENTIFIER':
             x = lexico.next()
           else:
-            print('Erro sintático: esperado identificador')
-            return 'erro'
+            print('Erro sintático: esperado identificador na linha ', x.linha)
+            sys.exit()
         # cumpriu parte da lista de identificadores
         if x.token == ':':
           x = lexico.next()
@@ -54,26 +55,59 @@ def DV(lexico):
               # testa se tem mais declaracoes ou já é "program id"
               x = lexico.next()
             else:
-              print('Erro sintático: esperado ";"')
-              return 'erro'
+              print('Erro sintático: esperado ";" na linha ', x.linha)
+              sys.exit()
           else:
-            print('Erro sintático: esperado tipo')
-            return 'erro'
+            lexico = lexico.devolver()
+            print('Erro sintático: esperado tipo na linha ', x.linha)
+            sys.exit()
+        elif x.classifier == 'IDENTIFIER': # esqueceu , - existem mais casos?
+          lexico = lexico.devolver()
+          print('Erro sintático: esperado "," na linha ', x.linha)
+          sys.exit()
         else:
-          print('Erro sintático: esperado ":"')
-          return 'erro'
+          lexico = lexico.devolver()
+          print('Erro sintático: esperado ":" na linha ', x.linha)
+          sys.exit()
       lexico.devolver()
-      print('Declaração de variáveis concluída')
+      print('Declaração de variáveis concluída na linha ', x.linha)
       return lexico 
     else:
-      print('Erro sintático: esperado identificador')
-      return 'erro'
+      print('Erro sintático: esperado identificador na linha ', x.linha)
+      sys.exit()
   else:
     lexico.devolver()
-    print('Declaração de variáveis concluída')
+    print('Declaração de variáveis concluída na linha ', x.linha)
     return lexico
 
 #############  Declaração de subprogramas  ################
+def lista_parametros(lexico): # base = A:integer, B:real
+  '''
+  lista_de_parametros →
+  lista_de_identificadores: tipo l_p'
+  l_p' -> , lista_de_identificadores: tipo
+  '''
+  x = lexico.next()
+  if x.classifier == 'IDENTIFIER':
+    x = lexico.next()
+    if x.token == ':':
+      x = lexico.next()
+      if x.token in ['integer', 'real', 'bool']:
+        x = lexico.next()
+        if x.token == ',':
+          lexico = lista_parametros(lexico)
+          return lexico
+        else:
+          lexico = lexico.devolver()
+          print('Declaração de parâmetros concluída na linha ', x.linha)
+          return lexico
+      else:
+        print('Erro sintático: esperado tipo na linha ', x.linha)
+        sys.exit()
+    else:
+      print('Erro sintático: esperado ":" na linha ', x.linha)
+      sys.exit()
+
 def DS(lexico):
   ''' Como funciona
   d_d_subs -> d_d_s ; d_d_subs' | e
@@ -87,19 +121,31 @@ def DS(lexico):
   if x.token == 'procedure':
     while(x.token == 'procedure'):
       x = lexico.next()
-      if x.token == 'id':
-        lexico = DV(lexico)
+      if x.classifier == 'IDENTIFIER': # id é id ou identifier?
         x = lexico.next()
-        if x.token == ';':
-          lexico = DV(lexico)
+        if x.token == '(':
+          lexico = lista_parametros(lexico) 
+          #if lexico == 'erro':
+          #  print('erro')
+          #  return erro
+          #else:
           x = lexico.next()
-        else:
-          print('Erro sintático: esperado ";"')
-          return 'erro'
+          if x.token != ')':
+            print('Erro sintático: esperado ")" na linha', x.linha)
+            sys.exit()
+        x = lexico.next()
+        if x.token != ';':
+          print('Erro sintático: esperando ";" na linha', x.linha)
+          sys.exit()
+        lexico = DV(lexico) # ok
+        x = lexico.next()
       else:
-        print('Erro sintático: esperado "id"')
-        return 'erro'
-    lexico.devolver()
+        print('Erro sintático: esperado "id" na linha', x.linha)
+        sys.exit()
+    lexico = lexico.devolver()
+    lexico = CC(lexico)
+    #if lexico == 'erro':
+    #  return 'erro'
     print('Declaração de subprogramas concluída')
     return lexico
   else:
@@ -132,7 +178,8 @@ def fator(lexico):
   | not fator 
   '''
   x = lexico.next()
-  if x.token in ['num_int', 'num_real', 'true', 'false']:
+  # num_int -> INTEGER, num_real -> REAL
+  if x.token in ['true', 'false'] or x.classifier in ['INTEGER', 'REAL']: 
     return lexico
   elif x.token == '(':
     lexico = expressao(lexico)
@@ -141,8 +188,8 @@ def fator(lexico):
       return lexico
     else:
       print('Erro sintático: esperado ")" na linha ', x.linha)
-      return 'erro'
-  elif x.token == 'id':
+      sys.exit()
+  elif x.classifier == 'IDENTIFIER': # id ou identifier?
     x = lexico.next()
     if x.token == '(':
       lexico = lista_expressoes(lexico)
@@ -157,7 +204,7 @@ def fator(lexico):
     return lexico
   else:
     print('Erro sintático: esperado termo na linha ', x.linha)
-    return 'erro'
+    sys.exit()
 
 def e_s(lexico):
   '''
@@ -185,8 +232,10 @@ def expressao_simples(lexico):
     lexico = fator(lexico)
     lexico = termo1(lexico)
     lexico = e_s(lexico)
+    return lexico
   else:
-    lexico = fator(lexico)
+    lexico = lexico.devolver()
+    lexico = fator(lexico) 
     lexico = termo1(lexico)
     lexico = e_s(lexico)
     return lexico
@@ -203,13 +252,13 @@ def expressao(lexico):
     lexico = expressao_simples(lexico)
     return lexico
   else:
-    lexico.devolver()
+    lexico = lexico.devolver()
     return lexico
 
 def lista_expressoes(lexico):
   lexico = expressao(lexico)
   x = lexico.next()
-  if x.token == ',':
+  if x.token == ',': # está certo?
     while x.token == ',':
       lexico = expressao(lexico)
       x = lexico.next()
@@ -230,7 +279,7 @@ def comando(lexico):
   '''
   x = lexico.next()
   if x.token == 'end':
-    lexico.devolver()
+    lexico = lexico.devolver()
     return lexico
   else:
     if x.classifier == 'IDENTIFIER':
@@ -239,6 +288,7 @@ def comando(lexico):
         lexico = expressao(lexico)
         return lexico
       else:
+        lexico = lexico.devolver() # NAO TINHA ANTES, SE DER ERRADO, TIRAR
         x = lexico.next()
         if x.token == '(':
           lexico = lista_expressoes(lexico)
@@ -247,7 +297,7 @@ def comando(lexico):
             return lexico
           else:
             print('Erro sintático: esperado ")" na linha ', x.linha)
-            return 'erro'
+            sys.exit()
         else:
           lexico = lexico.devolver()
           return lexico
@@ -255,10 +305,11 @@ def comando(lexico):
         lexico = lista_comandos(lexico)
         x = lexico.next()
         if x.token == 'end':
+          #lexico = lexico.devolver() # NAO TINHA ANTES, TIRAR SE PROVOCAR ERRO
           return lexico
         else:
           print('Erro sintático: esperado "end" na linha ', x.linha)
-          return 'erro'
+          sys.exit()
     elif x.token == 'if':
       lexico = expressao(lexico)
       x = lexico.next()
@@ -273,7 +324,7 @@ def comando(lexico):
           return lexico
       else:
         print('Erro sintático: esperado "then" na linha ', x.linha)
-        return 'erro'
+        sys.exit()
     elif x.token == 'while':
       lexico = expressao(lexico)
       x = lexico.next()
@@ -282,7 +333,7 @@ def comando(lexico):
         return lexico
       else:
         print('Erro sintático: esperado "do" na linha ', x.linha)
-        return 'erro'
+        sys.exit()
 
 def lista_comandos(lexico):
   lexico = comando(lexico)
@@ -291,6 +342,7 @@ def lista_comandos(lexico):
     while x.token == ';':
       lexico = comando(lexico)
       x = lexico.next()
+    lexico = lexico.devolver() # ESTAVA DANDO ERRO ANTES
     return lexico
   else:
     lexico = lexico.devolver()
@@ -303,15 +355,17 @@ def CC(lexico):
     lexico = lista_comandos(lexico)
     x = lexico.next()
     if x.token == 'end':
+      #print('Devolvendo na linha', x.linha)
+      
       return lexico
     else:
       print('Erro sintático: esperado "end" na linha', x.linha)
-      return 'erro'
+      sys.exit()
   else:
     print('Erro sintático: esperado "begin" na linha', x.linha)
-    return 'erro'
+    sys.exit()
 
-#############  Construção do léxico  ################
+#############  Construção do léxico  ################ 
 def analise_sintatica(analise_lexica):
   lexico = Lexico(analise_lexica)
   x = lexico.next()
@@ -322,38 +376,47 @@ def analise_sintatica(analise_lexica):
       if x.token == ';':
         print("Um programa foi declarado")
         resposta = DV(lexico)
-        if resposta == 'erro':
-          lexico.exibir()
-          print('Análise finalizada')
-        else:
-          resposta = DS(resposta)
-          if resposta == 'erro':
-            lexico.exibir()
-            print('Análise finalizada')
+        #if resposta == 'erro':
+        #  lexico.exibir()
+        #  print('Análise finalizada')
+        #else:
+        resposta = DS(resposta)
+          #if resposta == 'erro':
+          #  lexico.exibir()
+          #  print('Análise finalizada')
+          #else:
+        resposta = CC(resposta)
+          #  if resposta == 'erro':
+          #    print('Análise finalizada')
+          #  else:
+          #    print('\n FINALIZANDO \n')
+        try:
+          x = lexico.next()
+          if x.token == '.':
+            print('Programa está sintaticamente correto')
           else:
-            resposta = CC(resposta)
-            if resposta == 'erro':
-              print('Análise finalizada')
-            else:
-              x = lexico.next()
-              if x.token == '.':
-                print('Programa está sintaticamente correto')
+            print('Erro sintático: esperado "." na linha', x.linha)
+            print('Recebido: ', x.token)
+            resposta.exibir()
+            sys.exit()
+        except Exception as e:
+          print('Erro sintático: esperado "."')
       else:
-        print('Erro sintático: esperado ";"')
-        return 'erro'
+        print('Erro sintático: esperado ";" na linha', x.linha)
+        sys.exit()
     else:
-      print('Erro sintático: esperado identificador do programa')
-      return 'erro'
+      print('Erro sintático: esperado identificador do programa na linha', x.linha)
+      sys.exit()
   else:
-    print('Erro sintático: esperado "program"')
-    return 'erro'
+    print('Erro sintático: esperado "program" na linha', x.linha)
+    sys.exit()
 
 #############  Fluxo léxico (testes)  ################
 with open('entrada.pas', 'r') as arquivo:
   entrada = arquivo.read()
   #print(entrada)
   lexico.analisador_lexico(entrada)
-  
+
 
 #############  Fluxo principal  ################
 analise_lexica = []
