@@ -22,6 +22,71 @@ class Lexico:
     for token in self.analise_lexica[self.conta_tokens:]:
       print(token.token, token.classifier, token.linha)
 
+#############  Apoio do semântico  ################
+class PIdentificadores:
+  def __init__(self):
+    self.pilha = []
+    self.num_begin = 0
+  def marcar(self):
+    self.pilha.append('$')
+  def topo(self):
+    return self.pilha[-1]
+  def topo_indice(self):
+    return len(self.pilha)-1
+  def empilhar(self, token): # entrada
+    self.pilha.append(token)
+  def desempilhar(self): # saida
+    simbolo = self.topo()
+    while(simbolo!='$'):
+      self.pilha.pop()
+      simbolo = self.topo()
+    self.pilha.pop()
+  def declaracao(self, token): # verificar se pode declarar
+    simbolo = self.topo()
+    indice = self.topo_indice()
+    while(simbolo!='$'):
+      if simbolo == token:
+        return False
+      else:
+        indice -= 1
+        simbolo = self.pilha[indice]
+    return True
+  def procura(self, token): # verificar para uso
+    if self.topo_indice() != -1:
+      indice = self.topo_indice()
+      simbolo = self.pilha[indice]
+      while(indice != -1):
+        if simbolo == token:
+          return True
+        else:
+          indice -= 1
+          simbolo = self.pilha[indice]
+      return False
+  def begin(self):
+    self.num_begin += 1
+  def end(self):
+    self.num_begin -= 1
+  def verifica_begin(self):
+    return self.num_begin > 0
+
+class PCT:
+  def __init__(self):
+    self.pilha = []
+  def empilhar(self, token): # novo tipo
+    self.pilha.append(token)
+  def desempilhar(self): 
+    self.pilha.pop()
+  def topo(self):
+    return self.pilha[-1]
+  def subtopo(self):
+    return self.pilha[-2]
+  def atualizar(self, novo_tipo):
+    self.pilha.pop()
+    self.pilha.pop()
+    self.empilhar(novo_tipo)
+
+pid = PIdentificadores()
+pct = PCT()
 #############  Declaração de variáveis  ################
 def DV(lexico):
   x = lexico.next()
@@ -37,10 +102,20 @@ def DV(lexico):
     '''
     if x.classifier == 'IDENTIFIER':
       while(x.classifier == 'IDENTIFIER'):
+        if pid.declaracao(x.token):
+          pid.empilhar(x.token)
+        else:
+          print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
+          sys.exit()
         x = lexico.next()
         # loop (, id)
         while(x.token == ','):
           x = lexico.next()
+          if pid.declaracao(x.token):
+            pid.empilhar(x.token)
+          else:
+            print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
+            sys.exit()
           if x.classifier == 'IDENTIFIER':
             x = lexico.next()
           else:
@@ -88,7 +163,12 @@ def lista_parametros(lexico): # base = A:integer, B:real
   l_p' -> , lista_de_identificadores: tipo
   '''
   x = lexico.next()
-  if x.classifier == 'IDENTIFIER':
+  if x.classifier == 'IDENTIFIER': # else
+    if pid.declaracao(x.token):
+      pid.empilhar(x.token)
+    else:
+      print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
+      sys.exit()
     x = lexico.next()
     if x.token == ':':
       x = lexico.next()
@@ -123,6 +203,12 @@ def DS(lexico):
       x = lexico.next()
       if x.classifier == 'IDENTIFIER': # id é id ou identifier?
         x = lexico.next()
+        if pid.declaracao(x.token):
+          pid.empilhar(x.token)
+          pid.marcar()
+        else:
+          print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
+          sys.exit()
         if x.token == '(':
           lexico = lista_parametros(lexico) 
           #if lexico == 'erro':
@@ -352,6 +438,7 @@ def CC(lexico):
   x = lexico.next()
   if x.token == 'begin':
     # pode ter ou não comandos
+    pid.begin()
     lexico = lista_comandos(lexico)
     x = lexico.next()
     if x.token == 'end':
@@ -370,8 +457,10 @@ def analise_sintatica(analise_lexica):
   lexico = Lexico(analise_lexica)
   x = lexico.next()
   if x.token == 'program':
+    pid.marcar()
     x = lexico.next()
     if x.classifier == 'IDENTIFIER':
+      pid.empilhar(x.token)
       x = lexico.next()
       if x.token == ';':
         print("Um programa foi declarado")
