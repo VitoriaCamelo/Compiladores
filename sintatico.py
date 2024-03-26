@@ -1,6 +1,8 @@
 import sys
 import lexico
 
+# FALTA DESEMPILHAR
+
 #############  Básico  ################
 class Token:
   def __init__(self, token, classifier, linha):
@@ -62,6 +64,7 @@ class PIdentificadores:
           indice -= 1
           simbolo = self.pilha[indice]
       return False
+    return False
   def begin(self):
     self.num_begin += 1
   def end(self):
@@ -111,12 +114,12 @@ def DV(lexico):
         # loop (, id)
         while(x.token == ','):
           x = lexico.next()
-          if pid.declaracao(x.token):
-            pid.empilhar(x.token)
-          else:
-            print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
-            sys.exit()
           if x.classifier == 'IDENTIFIER':
+            if pid.declaracao(x.token):
+              pid.empilhar(x.token)
+            else:
+              print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
+              sys.exit()
             x = lexico.next()
           else:
             print('Erro sintático: esperado identificador na linha ', x.linha)
@@ -276,6 +279,9 @@ def fator(lexico):
       print('Erro sintático: esperado ")" na linha ', x.linha)
       sys.exit()
   elif x.classifier == 'IDENTIFIER': # id ou identifier?
+    if not pid.procura(x.token):
+      print(f'Erro semântico: "{x.token}" (linha {x.linha}) não foi declarado')
+      sys.exit()
     x = lexico.next()
     if x.token == '(':
       lexico = lista_expressoes(lexico)
@@ -369,6 +375,9 @@ def comando(lexico):
     return lexico
   else:
     if x.classifier == 'IDENTIFIER':
+      if not pid.procura(x.token):
+        print(f'Erro semântico: "{x.token}" (linha {x.linha}) não foi declarado')
+        sys.exit()
       x = lexico.next()
       if x.token == ':=':
         lexico = expressao(lexico)
