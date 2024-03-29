@@ -1,7 +1,7 @@
 import sys
 import lexico
 
-# FALTA DESEMPILHAR
+# FALTA VERIFICAR TIPOS
 
 #############  Básico  ################
 class Token:
@@ -78,9 +78,15 @@ class PIdentificadores:
 class PCT:
   def __init__(self):
     self.pilha = []
-  def empilhar(self, token): # novo tipo
-    self.pilha.append(token)
+  def empilhar(self, token, tipo): # novo tipo
+    self.pilha.append([token, tipo])
   def desempilhar(self): 
+    self.pilha.pop()
+  def desempilhar_marcacao(self):
+    simbolo = self.topo()
+    while(simbolo!='$'):
+      self.pilha.pop()
+      simbolo = self.topo()
     self.pilha.pop()
   def topo(self):
     return self.pilha[-1]
@@ -241,7 +247,7 @@ def DS(lexico):
         sys.exit()
     ##
     lexico = lexico.devolver()
-    lexico = CC(lexico)
+    #lexico = CC(lexico) # TINHA ANTES: DEVOLVER COM CAUTELA
     #if lexico == 'erro':
     #  return 'erro'
     print('Declaração de subprogramas concluída na linha', x.linha)
@@ -462,8 +468,6 @@ def CC(lexico):
     x = lexico.next()
     if x.token == 'end':
       #print('Devolvendo na linha', x.linha)
-      pid.exibir()
-      print("VOU DESEMPILHAR AGORA")
       pid.desempilhar()
       return lexico
     else:
