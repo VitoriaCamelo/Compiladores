@@ -1,7 +1,7 @@
 import sys
 import lexico
 
-# ATRIBUIR TIPOS ÀS VARIÁVEIS
+# ADEQUAR AO WHILE-DO E AO IF-THEN-ELSE
 
 #############  Básico  ################
 class Token:
@@ -75,16 +75,22 @@ class PIdentificadores:
     for token, tipo in self.pilha:
       print(token, tipo)
   def tipificar(self, tipo):
-    simbolo = self.topo()[0]
     tipo_atribuido = self.topo()[1]
-    indice = self.topo_indice()-1
-    print('indice: ', indice)
-    while (simbolo != '$' or tipo_atribuido is False) and indice != -1:
-      print('indice: ', indice)
+    indice = self.topo_indice()
+    while tipo_atribuido is False:
       self.pilha[indice][1] = tipo
-      simbolo = self.topo()[0]
-      tipo_atribuido = self.topo()[1]
-      indice = indice -1
+      indice = indice-1
+      tipo_atribuido = self.pilha[indice][1]
+  def tipo_simbolo(self, token):
+    if self.topo_indice() != -1:
+      indice = self.topo_indice()
+      simbolo = self.pilha[indice][0]
+      while(indice != -1):
+        if simbolo == token:
+          return self.pilha[indice][1]
+        else:
+          indice -= 1
+          simbolo = self.pilha[indice][0]
 
 class PCT:
   def __init__(self):
@@ -93,14 +99,9 @@ class PCT:
     self.pilha.append('$')
   def empilhar(self, tipo): # novo tipo
     self.pilha.append(tipo)
-  def desempilhar(self): 
-    self.pilha.pop()
-  def desempilhar_marcacao(self):
-    simbolo = self.topo()
-    while(simbolo!='$'):
+  def desempilhar(self):
+    while self.topo_indice() != -1:
       self.pilha.pop()
-      simbolo = self.topo()
-    self.pilha.pop()
   def topo(self):
     return self.pilha[-1]
   def subtopo(self):
@@ -109,6 +110,29 @@ class PCT:
     self.pilha.pop()
     self.pilha.pop()
     self.empilhar(novo_tipo)
+  def exibir(self):
+    for tipo in self.pilha:
+      print(tipo)
+  def tamanho(self):
+    return len(self.pilha)
+  def verificacao_simples(self):
+    return self.topo() == pid.tipo_simbolo(self.subtopo())
+  def topo_indice(self):
+    return len(self.pilha)-1
+  def verificacao(self):
+    while self.topo_indice() != 2:
+      tipo_topo = self.topo()
+      tipo_subtopo = self.subtopo()
+      self.pilha.pop()
+      self.pilha.pop()
+      if tipo_topo == 'integer' and tipo_subtopo == 'integer':
+        self.empilhar('integer')
+      elif tipo_topo in ['real', 'integer'] and tipo_subtopo in ['real', 'integer']:
+        self.empilhar('real')
+      else:
+        print(f'Tipos incompatíveis {tipo_topo} e {tipo_subtopo}')
+    return self.verificacao_simples()
+      
 
 pid = PIdentificadores()
 pct = PCT()
@@ -171,7 +195,6 @@ def DV(lexico):
           print('Erro sintático: esperado ":" na linha ', x.linha)
           sys.exit()
       lexico.devolver()
-      pid.exibir()
       print('Declaração de variáveis concluída na linha ', x.linha)
       return lexico 
     else:
@@ -298,7 +321,11 @@ def fator(lexico):
   '''
   x = lexico.next()
   # num_int -> INTEGER, num_real -> REAL
-  if x.token in ['true', 'false'] or x.classifier in ['INTEGER', 'REAL']: 
+  if x.token in ['true', 'false']:
+    pct.empilhar('boolean')
+    return lexico
+  elif x.classifier in ['INTEGER', 'REAL']: 
+    pct.empilhar(x.classifier.lower())
     return lexico
   elif x.token == '(':
     lexico = expressao(lexico)
@@ -312,6 +339,7 @@ def fator(lexico):
     if not pid.procura(x.token):
       print(f'Erro semântico: "{x.token}" (linha {x.linha}) não foi declarado')
       sys.exit()
+    pct.empilhar(pid.tipo_simbolo(x.token))
     x = lexico.next()
     if x.token == '(':
       lexico = lista_expressoes(lexico)
@@ -409,6 +437,7 @@ def comando(lexico):
       if not pid.procura(x.token):
         print(f'Erro semântico: "{x.token}" (linha {x.linha}) não foi declarado')
         sys.exit()
+      pct.empilhar(x.token)
       x = lexico.next()
       if x.token == ':=':
         lexico = expressao(lexico)
@@ -463,10 +492,26 @@ def comando(lexico):
 
 def lista_comandos(lexico):
   lexico = comando(lexico)
+  print('# PCT #')
+  pct.exibir()
+  if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
+  (pct.tamanho() > 3 and not pct.verificacao()):
+    print(f'Erro semântico: {pct.subtopo()} recebeu {pid.tipo_simbolo(pct.subtopo())}')
+    sys.exit()
+  pct.desempilhar()
   x = lexico.next()
   if x.token == ';':
     while x.token == ';':
+      pct.marcar()
       lexico = comando(lexico)
+      if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
+      (pct.tamanho() > 3 and not pct.verificacao()):
+        print(pct.topo(), pct.subtopo(), pid.tipo_simbolo(pct.subtopo()))
+        print(f'Erro semântico: {pct.subtopo()} recebeu {pid.tipo_simbolo(pct.subtopo())}')
+        sys.exit()
+      print('# PCT #')
+      pct.exibir()
+      pct.desempilhar()
       x = lexico.next()
     lexico = lexico.devolver() # ESTAVA DANDO ERRO ANTES
     return lexico
@@ -479,17 +524,18 @@ def CC(lexico):
   if x.token == 'begin':
     # pode ter ou não comandos
     pid.begin()
+    pct.marcar()
     lexico = lista_comandos(lexico)
     x = lexico.next()
     if x.token == 'end':
       #print('Devolvendo na linha', x.linha)
       pid.desempilhar()
+      pct.desempilhar()
       return lexico
     else:
       print('Erro sintático: esperado "end" na linha', x.linha)
       sys.exit()
   else:
-    lexico.exibir()
     print('Erro sintático: esperado "begin" na linha', x.linha)
     sys.exit()
 
