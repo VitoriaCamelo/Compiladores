@@ -1,7 +1,7 @@
 import sys
 import lexico
 
-# FALTA VERIFICAR TIPOS
+# ATRIBUIR TIPOS ÀS VARIÁVEIS
 
 #############  Básico  ################
 class Token:
@@ -30,39 +30,39 @@ class PIdentificadores:
     self.pilha = []
     self.num_begin = 0
   def marcar(self):
-    self.pilha.append('$')
+    self.pilha.append(['$', 'marcador'])
   def topo(self):
     return self.pilha[-1]
   def topo_indice(self):
     return len(self.pilha)-1
-  def empilhar(self, token): # entrada
-    self.pilha.append(token)
+  def empilhar(self, token, tipo): # entrada
+    self.pilha.append([token, tipo])
   def desempilhar(self): # saida
-    simbolo = self.topo()
+    simbolo = self.topo()[0]
     while(simbolo!='$'):
       self.pilha.pop()
-      simbolo = self.topo()
+      simbolo = self.topo()[0]
     self.pilha.pop()
   def declaracao(self, token): # verificar se pode declarar
-    simbolo = self.topo()
+    simbolo = self.topo()[0]
     indice = self.topo_indice()
     while(simbolo!='$'):
       if simbolo == token:
         return False
       else:
         indice -= 1
-        simbolo = self.pilha[indice]
+        simbolo = self.pilha[indice][0]
     return True
   def procura(self, token): # verificar para uso
     if self.topo_indice() != -1:
       indice = self.topo_indice()
-      simbolo = self.pilha[indice]
+      simbolo = self.pilha[indice][0]
       while(indice != -1):
         if simbolo == token:
           return True
         else:
           indice -= 1
-          simbolo = self.pilha[indice]
+          simbolo = self.pilha[indice][0]
       return False
     return False
   def begin(self):
@@ -72,14 +72,27 @@ class PIdentificadores:
   def verifica_begin(self):
     return self.num_begin > 0
   def exibir(self):
-    for token in self.pilha:
-      print(token)
+    for token, tipo in self.pilha:
+      print(token, tipo)
+  def tipificar(self, tipo):
+    simbolo = self.topo()[0]
+    tipo_atribuido = self.topo()[1]
+    indice = self.topo_indice()-1
+    print('indice: ', indice)
+    while (simbolo != '$' or tipo_atribuido is False) and indice != -1:
+      print('indice: ', indice)
+      self.pilha[indice][1] = tipo
+      simbolo = self.topo()[0]
+      tipo_atribuido = self.topo()[1]
+      indice = indice -1
 
 class PCT:
   def __init__(self):
     self.pilha = []
-  def empilhar(self, token, tipo): # novo tipo
-    self.pilha.append([token, tipo])
+  def marcar(self):
+    self.pilha.append('$')
+  def empilhar(self, tipo): # novo tipo
+    self.pilha.append(tipo)
   def desempilhar(self): 
     self.pilha.pop()
   def desempilhar_marcacao(self):
@@ -115,7 +128,7 @@ def DV(lexico):
     if x.classifier == 'IDENTIFIER':
       while(x.classifier == 'IDENTIFIER'):
         if pid.declaracao(x.token):
-          pid.empilhar(x.token)
+          pid.empilhar(x.token, False)
         else:
           print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
           sys.exit()
@@ -125,7 +138,7 @@ def DV(lexico):
           x = lexico.next()
           if x.classifier == 'IDENTIFIER':
             if pid.declaracao(x.token):
-              pid.empilhar(x.token)
+              pid.empilhar(x.token, False)
             else:
               print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
               sys.exit()
@@ -136,7 +149,8 @@ def DV(lexico):
         # cumpriu parte da lista de identificadores
         if x.token == ':':
           x = lexico.next()
-          if x.token in ['integer', 'real', 'boolean']: # já foi bool
+          if x.token in ['integer', 'real', 'boolean']:# já foi bool
+            pid.tipificar(x.token)
             x = lexico.next()
             if x.token == ';':
               # testa se tem mais declaracoes ou já é "program id"
@@ -157,6 +171,7 @@ def DV(lexico):
           print('Erro sintático: esperado ":" na linha ', x.linha)
           sys.exit()
       lexico.devolver()
+      pid.exibir()
       print('Declaração de variáveis concluída na linha ', x.linha)
       return lexico 
     else:
@@ -177,7 +192,7 @@ def lista_parametros(lexico): # base = A:integer, B:real
   x = lexico.next()
   if x.classifier == 'IDENTIFIER': # else
     if pid.declaracao(x.token):
-      pid.empilhar(x.token)
+      pid.empilhar(x.token, False)
     else:
       print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
       sys.exit()
@@ -216,7 +231,7 @@ def DS(lexico):
       x = lexico.next()
       if x.classifier == 'IDENTIFIER': # id é id ou identifier?
         if pid.declaracao(x.token):
-          pid.empilhar(x.token)
+          pid.empilhar(x.token, 'programa')
           pid.marcar()
         else:
           print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
@@ -486,7 +501,7 @@ def analise_sintatica(analise_lexica):
     pid.marcar()
     x = lexico.next()
     if x.classifier == 'IDENTIFIER':
-      pid.empilhar(x.token)
+      pid.empilhar(x.token, 'programa')
       x = lexico.next()
       if x.token == ';':
         print("Um programa foi declarado")
