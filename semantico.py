@@ -1,7 +1,7 @@
 import sys
 import lexico
 
-# ADEQUAR AO WHILE-DO E AO IF-THEN-ELSE
+# ADEQUAR AO WHILE, AO IF E À PASSAGEM DE PARÂMETROS (FUNÇÕES)
 
 #############  Básico  ################
 class Token:
@@ -120,7 +120,7 @@ class PCT:
   def topo_indice(self):
     return len(self.pilha)-1
   def verificacao(self):
-    while self.topo_indice() != 2:
+    while self.topo_indice() > 2: # antes era 1
       tipo_topo = self.topo()
       tipo_subtopo = self.subtopo()
       self.pilha.pop()
@@ -130,9 +130,20 @@ class PCT:
       elif tipo_topo in ['real', 'integer'] and tipo_subtopo in ['real', 'integer']:
         self.empilhar('real')
       else:
-        print(f'Tipos incompatíveis {tipo_topo} e {tipo_subtopo}')
+        print(f'Tipos/operação incompatível(is) {tipo_topo} e {tipo_subtopo}')
+        sys.exit()
     return self.verificacao_simples()
-      
+  def avaliar(self):
+    if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
+    (pct.tamanho() > 3 and not pct.verificacao()):
+      pct.exibir()
+      print(pct.topo(), pct.subtopo(), pid.tipo_simbolo(pct.subtopo()))
+      print(f'Erro semântico: {pct.subtopo()} recebeu {pct.topo()}')
+      sys.exit()
+    '''
+    elif pct.tamanho() >= 3:
+    print(pct.topo(), pct.subtopo(), pct.topo())
+    '''
 
 pid = PIdentificadores()
 pct = PCT()
@@ -430,7 +441,7 @@ def comando(lexico):
   x = lexico.next()
   if x.token == 'end':
     lexico = lexico.devolver()
-    return lexico
+    return lexico, 0
   else:
     if x.classifier == 'IDENTIFIER':
       #pid.exibir()
@@ -441,7 +452,7 @@ def comando(lexico):
       x = lexico.next()
       if x.token == ':=':
         lexico = expressao(lexico)
-        return lexico
+        return lexico, 0
       else:
         lexico = lexico.devolver() # NAO TINHA ANTES, SE DER ERRADO, TIRAR
         x = lexico.next()
@@ -449,68 +460,72 @@ def comando(lexico):
           lexico = lista_expressoes(lexico)
           x = lexico.next()
           if x.token == ')':
-            return lexico
+            return lexico, 0
           else:
             print('Erro sintático: esperado ")" na linha ', x.linha)
             sys.exit()
         else:
           lexico = lexico.devolver()
-          return lexico
+          return lexico, 0
     elif x.token == 'begin':
         lexico = lista_comandos(lexico)
         x = lexico.next()
         if x.token == 'end':
           #lexico = lexico.devolver() # NAO TINHA ANTES, TIRAR SE PROVOCAR ERRO
-          return lexico
+          return lexico, 0
         else:
           print('Erro sintático: esperado "end" na linha ', x.linha)
           sys.exit()
-    elif x.token == 'if':
+    elif x.token == 'if': # precisa resultar em booleano
+      pct.marcar()
       lexico = expressao(lexico)
       x = lexico.next()
+      pct.desempilhar()
       if x.token == 'then':
-        lexico = comando(lexico)
+        pct.marcar()
+        lexico, avaliado = comando(lexico)
+        pct.avaliar()
+        pct.desempilhar()
         x = lexico.next()
         if x.token == 'else':
-          lexico = comando(lexico)
-          return lexico
+          pct.marcar()
+          lexico, avaliado = comando(lexico)
+          pct.avaliar()
+          pct.desempilhar()
+          return lexico, 1
         else:
           lexico = lexico.devolver()
-          return lexico
+          return lexico, 1
       else:
         print('Erro sintático: esperado "then" na linha ', x.linha)
         sys.exit()
-    elif x.token == 'while':
+    elif x.token == 'while': # precisa resultar em booleano
+      pct.marcar()
       lexico = expressao(lexico)
+      pct.desempilhar()
       x = lexico.next()
       if x.token == 'do':
-        lexico = comando(lexico)
-        return lexico
+        pct.marcar()
+        lexico, avaliado = comando(lexico)
+        pct.avaliar()
+        pct.desempilhar()
+        return lexico, 1
       else:
         print('Erro sintático: esperado "do" na linha ', x.linha)
         sys.exit()
 
 def lista_comandos(lexico):
-  lexico = comando(lexico)
-  print('# PCT #')
-  pct.exibir()
-  if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
-  (pct.tamanho() > 3 and not pct.verificacao()):
-    print(f'Erro semântico: {pct.subtopo()} recebeu {pid.tipo_simbolo(pct.subtopo())}')
-    sys.exit()
+  lexico, avaliado = comando(lexico)
+  if not avaliado: 
+    pct.avaliar()
   pct.desempilhar()
   x = lexico.next()
   if x.token == ';':
     while x.token == ';':
       pct.marcar()
-      lexico = comando(lexico)
-      if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
-      (pct.tamanho() > 3 and not pct.verificacao()):
-        print(pct.topo(), pct.subtopo(), pid.tipo_simbolo(pct.subtopo()))
-        print(f'Erro semântico: {pct.subtopo()} recebeu {pid.tipo_simbolo(pct.subtopo())}')
-        sys.exit()
-      print('# PCT #')
-      pct.exibir()
+      lexico, avaliado = comando(lexico)
+      if not avaliado:
+        pct.avaliar()
       pct.desempilhar()
       x = lexico.next()
     lexico = lexico.devolver() # ESTAVA DANDO ERRO ANTES
@@ -588,12 +603,12 @@ def analise_sintatica(analise_lexica):
     sys.exit()
 
 #############  Fluxo léxico (testes)  ################
-'''
+
 with open('SemanticoTest.pas', 'r') as arquivo:
   entrada = arquivo.read()
   #print(entrada)
   lexico.analisador_lexico(entrada)
-'''
+
 
 
 #############  Fluxo principal  ################
