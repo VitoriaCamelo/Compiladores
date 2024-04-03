@@ -1,16 +1,11 @@
 import sys
 import lexico
 
-# Mais de 1 parâmetro
-
 '''
-Análise de operadores booleanos:
 <>/==: int-int, real-real, bool-bool
 >/</<=/>=, int-real, real-int, int-int, real, real
-1. análise simples (2 operandos, tamanho = 5)
-$ variavel = tipo, operador, tipo
-'''
 
+'''
 #############  Básico  ################
 class Token:
   def __init__(self, token, classifier, linha):
@@ -129,8 +124,8 @@ class PCT:
     return self.topo() == pid.tipo_simbolo(self.subtopo())
   def topo_indice(self):
     return len(self.pilha)-1
-  def verificacao(self):
-    while self.topo_indice() > 2: # antes era 1
+  def verificacao(self, indice):
+    while self.topo_indice() > indice: # antes era 2
       tipo_topo = self.topo()
       tipo_subtopo = self.subtopo()
       self.pilha.pop()
@@ -145,7 +140,7 @@ class PCT:
     return self.verificacao_simples()
   def avaliar(self):
     if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
-    (pct.tamanho() > 3 and not pct.verificacao()):
+    (pct.tamanho() > 3 and not pct.verificacao(2)):
       #pct.exibir()
       print(pct.topo(), pct.subtopo(), pid.tipo_simbolo(pct.subtopo()))
       print(f'Erro semântico: {pct.subtopo()} recebeu {pct.topo()}')
@@ -326,6 +321,7 @@ def DS(lexico):
           print('Erro sintático: esperando ";" na linha', x.linha)
           sys.exit()
         lexico = DV(lexico) # ok
+        lexico = DS(lexico) 
         lexico = CC(lexico) # NAO TINHA, TIRAR SER DER PROBLEMA
         x = lexico.next()
       else:
@@ -456,11 +452,17 @@ def expressao(lexico):
 
 def lista_expressoes(lexico):
   lexico = expressao(lexico)
+  indice = 2
+  if pct.tamanho()>2:
+    pct.verificacao(indice)
   x = lexico.next()
   if x.token == ',': # está certo?
     while x.token == ',':
       lexico = expressao(lexico)
+      if pct.tamanho()>2:
+        pct.verificacao(indice+1)
       x = lexico.next()
+    lexico = lexico.devolver()
     return lexico
   else:
     lexico = lexico.devolver()
@@ -502,6 +504,7 @@ def comando(lexico):
           #print(lista, parametros)
           if len(lista) != len(parametros):
             print(f'Erro semântico: número incorreto de parâmetros para {pct.funcao()}')
+            sys.exit()
           for i in range(len(parametros)):
             if parametros[i][1] != lista[i]:
               print(f'Erro semântico: parâmetros da função {pct.funcao()} não correspondem')
@@ -623,24 +626,12 @@ def analise_sintatica(analise_lexica):
       if x.token == ';':
         print("Um programa foi declarado")
         resposta = DV(lexico)
-        #if resposta == 'erro':
-        #  lexico.exibir()
-        #  print('Análise finalizada')
-        #else:
         resposta = DS(resposta)
-          #if resposta == 'erro':
-          #  lexico.exibir()
-          #  print('Análise finalizada')
-          #else:
         resposta = CC(resposta)
-          #  if resposta == 'erro':
-          #    print('Análise finalizada')
-          #  else:
-          #    print('\n FINALIZANDO \n')
         try:
           x = lexico.next()
           if x.token == '.':
-            print('Programa está sintaticamente correto')
+            print('O programa está sintatica e semanticamente correto')
           else:
             print('Erro sintático: esperado "." na linha', x.linha)
             print('Recebido: ', x.token)
