@@ -1,7 +1,15 @@
 import sys
 import lexico
 
-# ADEQUAR AO WHILE, AO IF E À PASSAGEM DE PARÂMETROS (FUNÇÕES)
+# Mais de 1 parâmetro
+
+'''
+Análise de operadores booleanos:
+<>/==: int-int, real-real, bool-bool
+>/</<=/>=, int-real, real-int, int-int, real, real
+1. análise simples (2 operandos, tamanho = 5)
+$ variavel = tipo, operador, tipo
+'''
 
 #############  Básico  ################
 class Token:
@@ -106,10 +114,12 @@ class PCT:
     return self.pilha[-1]
   def subtopo(self):
     return self.pilha[-2]
+  '''
   def atualizar(self, novo_tipo):
     self.pilha.pop()
     self.pilha.pop()
     self.empilhar(novo_tipo)
+  '''
   def exibir(self):
     for tipo in self.pilha:
       print(tipo)
@@ -136,7 +146,7 @@ class PCT:
   def avaliar(self):
     if (pct.tamanho() == 3 and not pct.verificacao_simples()) or \
     (pct.tamanho() > 3 and not pct.verificacao()):
-      pct.exibir()
+      #pct.exibir()
       print(pct.topo(), pct.subtopo(), pid.tipo_simbolo(pct.subtopo()))
       print(f'Erro semântico: {pct.subtopo()} recebeu {pct.topo()}')
       sys.exit()
@@ -144,9 +154,31 @@ class PCT:
     elif pct.tamanho() >= 3:
     print(pct.topo(), pct.subtopo(), pct.topo())
     '''
+  def retornar(self):
+    lista = []
+    indice = 2
+    while(indice<=self.topo_indice()):
+      simbolo = self.pilha[indice]
+      lista.append(simbolo)
+      indice +=1
+    return lista
+  def funcao(self):
+    return self.pilha[1]
+  def vsimples_bool(self):
+    operador = self.pilha[3]
+    if ((operador in ['<>', '==']) and (self.pilha[2] != self.pilha[4])) or\
+    ((operador in ['>', '<', '>=', '<=']) and (self.pilha[2] == 'boolean' or\
+                                               self.pilha[4] == 'boolean')):
+        print(f'Tipos incompatíveis para {operador}: {self.pilha[2]} e {self.pilha[4]}')
+        sys.exit()
+  def v_simples(self):
+    if self.topo() != 'boolean':
+      print(f'Erro semântico: "while" não aceita {self.topo()}')
+      sys.exit()
 
 pid = PIdentificadores()
 pct = PCT()
+funcoes_parametros = {}
 #############  Declaração de variáveis  ################
 def DV(lexico):
   x = lexico.next()
@@ -217,7 +249,7 @@ def DV(lexico):
     return lexico
 
 #############  Declaração de subprogramas  ################
-def lista_parametros(lexico): # base = A:integer, B:real
+def lista_parametros(lexico, funcao): # base = A:integer, B:real
   '''
   lista_de_parametros →
   lista_de_identificadores: tipo l_p'
@@ -230,17 +262,20 @@ def lista_parametros(lexico): # base = A:integer, B:real
     else:
       print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
       sys.exit()
+    variavel = x.token
     x = lexico.next()
     if x.token == ':':
       x = lexico.next()
       if x.token in ['integer', 'real', 'bool']:
+        funcoes_parametros[funcao].append([variavel, x.token])
         x = lexico.next()
         if x.token == ',':
-          lexico = lista_parametros(lexico)
+          lexico = lista_parametros(lexico, funcao)
           return lexico
         else:
           lexico = lexico.devolver()
           print('Declaração de parâmetros concluída na linha ', x.linha)
+          #print(funcoes_parametros[funcao])
           return lexico
       else:
         print('Erro sintático: esperado tipo na linha ', x.linha)
@@ -267,13 +302,15 @@ def DS(lexico):
         if pid.declaracao(x.token):
           pid.empilhar(x.token, 'programa')
           pid.marcar()
+          funcoes_parametros[x.token] = []
+          funcao = x.token
         else:
           print(f'Erro semântico: {x.token} já declarado antes da linha {x.linha}')
           sys.exit()
         x = lexico.next()
         if x.token == '(':
           count_abriu = 1
-          lexico = lista_parametros(lexico) 
+          lexico = lista_parametros(lexico, funcao) 
           #if lexico == 'erro':
           #  print('erro')
           #  return erro
@@ -407,9 +444,10 @@ def expressao(lexico):
   | expressão_simples op_relacional expressão_simples
   op_relacional -> = | < | > | <= | >= | <>
   '''
-  lexico = expressao_simples(lexico)
+  lexico = expressao_simples(lexico) # talvez simplificar expressao aqui
   x = lexico.next()
   if x.token in ['=', '<', '>', '<=', '>=', '<>']:
+    pct.empilhar(x.token)
     lexico = expressao_simples(lexico)
     return lexico
   else:
@@ -458,6 +496,17 @@ def comando(lexico):
         x = lexico.next()
         if x.token == '(':
           lexico = lista_expressoes(lexico)
+          #pct.exibir()
+          lista = pct.retornar()
+          parametros = funcoes_parametros[pct.funcao()]
+          #print(lista, parametros)
+          if len(lista) != len(parametros):
+            print(f'Erro semântico: número incorreto de parâmetros para {pct.funcao()}')
+          for i in range(len(parametros)):
+            if parametros[i][1] != lista[i]:
+              print(f'Erro semântico: parâmetros da função {pct.funcao()} não correspondem')
+              sys.exit()
+          pct.desempilhar()
           x = lexico.next()
           if x.token == ')':
             return lexico, 0
@@ -479,6 +528,8 @@ def comando(lexico):
     elif x.token == 'if': # precisa resultar em booleano
       pct.marcar()
       lexico = expressao(lexico)
+      if pct.tamanho() == 5:
+        pct.vsimples_bool()
       x = lexico.next()
       pct.desempilhar()
       if x.token == 'then':
@@ -500,8 +551,13 @@ def comando(lexico):
         print('Erro sintático: esperado "then" na linha ', x.linha)
         sys.exit()
     elif x.token == 'while': # precisa resultar em booleano
-      pct.marcar()
+      #pct.marcar()
       lexico = expressao(lexico)
+      if pct.tamanho() == 2:
+        pct.v_simples()
+      #pct.exibir()
+      if pct.tamanho() == 5:
+        pct.vsimples_bool()
       pct.desempilhar()
       x = lexico.next()
       if x.token == 'do':
