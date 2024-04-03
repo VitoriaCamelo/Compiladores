@@ -11,6 +11,17 @@ def analisador_lexico(entrada):
   palavras_reservadas = ['program', 'var', 'integer', 'real', 'boolean', 'procedure']
   palavras_reservadas += ['begin', 'end', 'if', 'then', 'else', 'while', 'do', 'not']
   
+  class Comentario:
+    def __init__(self):
+      self.pilha = []
+      self.abriu = 0
+    def abrir(self):
+      self.abriu = 1
+    def fechar(self):
+      self.abriu = 0
+    def estado(self):
+      return self.abriu
+      
   estados_finais = {
     'b': 'IDENTIFIER',
     'c': 'INTEGER'  ,
@@ -79,55 +90,65 @@ def analisador_lexico(entrada):
   string_atual = ''
   tabela = []
   linha = 0
-  
+  comentario = Comentario()
   for caractere in entrada:
-    if caractere == '\n': # and estado_atual in configuracoes
-      # pode ter pegadinha aqui
-      #print(string_atual, caractere, estado_atual)
-      if estado_atual in estados_finais:
+    if not comentario.estado() and caractere == '{': 
+      comentario.abrir()
+    elif comentario.estado() and caractere == '}': 
+      comentario.fechar()
+    elif comentario.estado() == 0 and caractere == '}':
+      print(f'Erro léxico: comentário não foi aberto antes da linha {linha+1}')
+      sys.exit()
+    elif not comentario.estado():
+      if caractere == '\n': # and estado_atual in configuracoes
+        # pode ter pegadinha aqui
+        #print(string_atual, caractere, estado_atual)
+        if estado_atual in estados_finais:
+          tabela.append((string_atual, estados_finais[estado_atual], linha))
+          string_atual = ''
+        linha += 1
+        estado_atual = 'a'
+      elif caractere == ' ' and estado_atual in estados_finais:
         tabela.append((string_atual, estados_finais[estado_atual], linha))
         string_atual = ''
-      linha += 1
-      estado_atual = 'a'
-    elif caractere == ' ' and estado_atual in estados_finais:
-      tabela.append((string_atual, estados_finais[estado_atual], linha))
-      string_atual = ''
-      estado_atual = 'a'
-    elif caractere == ' ' and estado_atual == 'a':
-      estado_atual = 'a'
-    else:
-      count = 0
-      for opcoes in configuracoes[estado_atual]:
-        if caractere in opcoes[0]:
-          estado_atual = opcoes[1]
-          count += 1
-          if estado_atual != 'k' and caractere != '}':
-            string_atual += caractere
-  
-      if count == 0:
-        if estado_atual == 'k':
-          estado_atual = 'k'
-        else: 
-          if estado_atual in estados_finais:
-            tabela.append((string_atual, estados_finais[estado_atual], linha))
-            string_atual = ''
-          estado_atual = 'a'
-          if caractere != ' ':
-            string_atual = caractere
-          for opcoes in configuracoes[estado_atual]:
-            if caractere in opcoes[0]:
-              estado_atual = opcoes[1]
-              count += 1
-          if count == 0:
-            tabela.append((string_atual, 'ERROR', linha))
-            string_atual = ''
+        estado_atual = 'a'
+      elif caractere == ' ' and estado_atual == 'a':
+        estado_atual = 'a'
+      else:
+        count = 0
+        for opcoes in configuracoes[estado_atual]:
+          if caractere in opcoes[0]:
+            estado_atual = opcoes[1]
+            count += 1
+            if estado_atual != 'k' and caractere != '}':
+              string_atual += caractere
+    
+        if count == 0:
+          if estado_atual == 'k':
+            estado_atual = 'k'
+          else: 
+            if estado_atual in estados_finais:
+              tabela.append((string_atual, estados_finais[estado_atual], linha))
+              string_atual = ''
+            estado_atual = 'a'
+            if caractere != ' ':
+              string_atual = caractere
+            for opcoes in configuracoes[estado_atual]:
+              if caractere in opcoes[0]:
+                estado_atual = opcoes[1]
+                count += 1
+            if count == 0:
+              tabela.append((string_atual, 'ERROR', linha))
+              string_atual = ''
   if estado_atual in estados_finais:
     tabela.append((string_atual, estados_finais[estado_atual], linha))
   else: 
     tabela.append((string_atual, 'ERROR', linha))
   
   #print("\n--- Aqui vem a tabela ---")
-  
+  if comentario.estado():
+    print(f'Erro léxico: comentário não foi fechado na linha {linha+1}')
+    sys.exit()
   with open('saida.txt', 'w') as f:
     more_lines = []
     for instancia in tabela:
